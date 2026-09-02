@@ -6,22 +6,65 @@
 struct Bullet{  //Keeps track of the bullets x and y coordiante 
     int x;
     int y;
-    
+};
+
+struct HardEnemy{
+    int x;
+    int y;
 };
 
 struct BasicEnemy{ // Holds the top left and bottom right of the image, with a method 
                    // that tells the enemy how to move
+    bool moveBacknForth;
+    bool right = true;
+    int moveValue = 0;
     int x;
     int y;
     int bottomx;
     int bottomy;
+    Texture2D enemyimage = LoadTexture("enemy1.png");
     
     void updateframe(){
-        y += 2;
+        if(moveBacknForth){ //If moveBacknForth is true, this tells the enemy how to do that 
+            if(right){ //Moves the enemy to the right
+                x+=2;
+                bottomx +=2;
+                y += 2;
+                bottomy +=2;
+                moveValue++;
+            if(moveValue == 40){
+                right = false;}
+           } 
+           else { //Moves the enemy to the left
+                x-=2;
+                bottomx -=2;
+                y += 2;
+                bottomy +=2; 
+                moveValue--;
+                if(moveValue == 0){
+                    right = true;
+                }
+                
+           }
+
+        } else{ //Basic Enemy goes straight down
+            y += 2;
+            bottomy +=2;
+        }
+        
     }
-    
-    
 };
+struct ExplodingEnemy{ //Holds the x and y position of where an enemy was killed, so we 
+                        // know where to put the explosion
+    int x;
+    int y;
+    int opaqueness = 128;
+    
+    void updateframe(){
+        opaqueness -= 5;
+    }
+};
+
 
 
 
@@ -39,6 +82,10 @@ int main(void)
     
     int userpositionx = 235;
     int userpositiony = 800;
+    int userpositionbottomx = userpositionx + 76;
+    int userpositionbottomy = userpositiony + 76; 
+    
+    int userLives = 3;
     
     int backgroundy = 0;
     
@@ -62,27 +109,43 @@ int main(void)
     Texture2D bulletimage = LoadTexture("bullet.png");
     Texture2D enemyimage = LoadTexture("enemy1.png");
     Texture2D explosion = LoadTexture("explosion.png");
+    Texture2D ThreeLivesImage = LoadTexture("HealthBar-3.png");
+    Texture2D TwoLivesImage = LoadTexture("HealthBar-2.png");
+    Texture2D OneLivesImage = LoadTexture("HealthBar-1.png");
+    Texture2D ZeroLivesImage = LoadTexture("HealthBar-0.png");
+    
+    //Logo Processing
+    Texture2D logoimage = LoadTexture("logo1.png");
+    int logox = -123;
+    int logoy = 75;
+    float logoOp = 255;
     
     std::vector<Bullet> firingbullets; //This vector holds all active bullets on the screenHeight
     
     // This holds enemy positions for the first wave
     std::vector<BasicEnemy> level1;
-    int enemypos = 100;
+    std::vector<ExplodingEnemy> currentlyExploding;
     
-    //fills first level with enemies 
+    
+    
+    
+    //LEVEL 1 ENEMY LAYOUT
+    int enemypos = 100;
     for(int i = 0; i < 6; i++){
         BasicEnemy enemy;
         enemy.x = enemypos;
-        enemy.y = 00;
-        enemy.bottomx = enemy.x+49;
-        enemy.bottomy = enemy.y+49;
+        enemy.y = -250;
+        enemy.bottomx = enemy.x+50;
+        enemy.bottomy = enemy.y+50;
         
-        
+        enemy.moveBacknForth = true;
         
         level1.push_back(enemy);
         enemypos+=75;
-        
     }
+    
+
+    
     
     
     
@@ -116,9 +179,21 @@ int main(void)
             userpositionx+= speed;
             currentusersprite = userspriteright;
             }
+        } else if (IsKeyDown(KEY_W)) {
+            if (userpositiony != 200){
+                userpositiony -= speed;
+                currentusersprite = usersprite;
+            }
+        } else if (IsKeyDown(KEY_S)){
+            if (userpositiony != 865){
+                userpositiony += speed;
+                currentusersprite = usersprite;
+            }
         } else {
             currentusersprite = usersprite;
         }
+        
+
         //SHOOTING
         if (IsMouseButtonPressed(0)){
             //When the mouse is pressed, create a new strcut with the bullet x and y being (35,17) from the users
@@ -156,6 +231,49 @@ int main(void)
             
             DrawTexture(currentusersprite, userpositionx, userpositiony, WHITE);//Draws users position
             
+
+            
+            //loop that draws all enemies in level1
+            for(int i = (int)level1.size() - 1; i >= 0; i--){
+                
+                bool hit = false;
+                for(int j = (int)firingbullets.size() - 1; j >= 0; j--){
+                    
+                    if(firingbullets[j].x > level1[i].x && firingbullets[j].x < level1[i].bottomx && firingbullets[j].y < level1[i].bottomy && firingbullets[j].y > level1[i].y){
+                        
+                        //This is where the collision happens
+                        ExplodingEnemy exploding;
+                        exploding.x = level1[i].x;
+                        exploding.y = level1[i].y;
+                        
+                        currentlyExploding.push_back(exploding);
+                        
+                        hit = true;
+                        firingbullets.erase(firingbullets.begin() + j);
+                        break;
+                        
+                    }
+                    
+                }
+              
+                if(!hit) {  // Only draw and update if NOT hit
+                    DrawTexture(level1[i].enemyimage, level1[i].x, level1[i].y, WHITE);
+                    level1[i].updateframe();
+                    
+                    if(level1[i].bottomy > 895){
+                        userLives--;
+                        level1.erase(level1.begin() + i);
+                    }
+                    
+                    
+                } else {
+                    // Draw explosion here if you want
+                    level1.erase(level1.begin() + i);
+                }
+                    
+                
+            }
+            
             //loop that draws all bullets
             for(size_t i = 0; i < firingbullets.size(); i++){
                 
@@ -165,45 +283,41 @@ int main(void)
                 
                 firingbullets[i].y -= 8;
                 DrawTexture(bulletimage, firingbullets[i].x, firingbullets[i].y, WHITE);   
-
-               
             }
             
-            //loop that draws all enemies in level1
-            for(int i = (int)level1.size() - 1; i >= 0; i--){
-                bool hit = false;
+            for(size_t i = 0; i < currentlyExploding.size(); i++){
+                if(currentlyExploding[i].opaqueness <= 10){
+                    currentlyExploding.erase(currentlyExploding.begin() + (int)i);
+                }                    
+                DrawTexture(explosion,currentlyExploding[i].x, currentlyExploding[i].y, (Color){255, 255, 255, currentlyExploding[i].opaqueness});
+                currentlyExploding[i].updateframe();
                 
-                
-                
-                for(int j = (int)firingbullets.size() - 1; j >= 0; j--){
-                    
-                    if(firingbullets[j].x > level1[i].x && firingbullets[j].x < level1[i].bottomx && firingbullets[j].y > level1[i].y && firingbullets[j].y < level1[i].bottomy){
-                        
-                        hit = true;
-                        DrawText("Hit!", 100, 100, 20, RED);
-                        firingbullets.erase(firingbullets.begin() + j);
-                        break;
-                        
-                    }
-                    
-                }
-              
-                if(!hit) {  // Only draw and update if NOT hit
-                    DrawTexture(enemyimage, level1[i].x, level1[i].y, WHITE);
-                    level1[i].updateframe();
-                } else {
-                    // Draw explosion here if you want
-                    level1.erase(level1.begin() + i);
-                }
-                    
                 
             }
             
             
             
             
+        if(userLives == 3){
+            DrawTexture(ThreeLivesImage, 300,0,WHITE);
+        } else if (userLives == 2){
+            DrawTexture(TwoLivesImage, 300,0,WHITE);
+        } else if (userLives == 1){
+            DrawTexture(OneLivesImage, 300,0,WHITE);
+        } else {
+            DrawTexture(ZeroLivesImage, 300,0,WHITE);
+            DrawRectangle(0, 0, 600, 900, (Color){255, 0, 0, 128});
+        }
+        
+        if(logoOp > 1){
+            DrawTexture(logoimage, logox,logoy,(Color){255, 255, 255, logoOp});
+            logoOp-=0.8;
+            if (logoOp < 100){
+                logoOp-=0.8;
+            }
             
-            
+        }
+        
 
         EndDrawing();
         //----------------------------------------------------------------------------------
